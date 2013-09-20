@@ -20,14 +20,14 @@ package com.cloudera.sa.giraph.examples.ktrusses;
 
 import org.apache.giraph.aggregators.BasicAggregator;
 
-public class WritableKTrussesPhaseAggregator extends BasicAggregator<WritableKTrussesPhase> {
+public class PhaseWritableAggregator extends BasicAggregator<PhaseWritable> {
 
-	public void aggregate(WritableKTrussesPhase value) {
+	public void aggregate(PhaseWritable value) {
 		getAggregatedValue().set(value.get());
 	}
 
 
-	public WritableKTrussesPhase createInitialValue() {
-		return new WritableKTrussesPhase();
+	public PhaseWritable createInitialValue() {
+		return new PhaseWritable();
 	}
 }

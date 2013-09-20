@@ -6,15 +6,15 @@ import java.io.IOException;
 
 import org.apache.hadoop.io.Writable;
 
-public class KTrussesNodeWritable implements Writable {
+public class VertexState implements Writable {
 
 	private int degree;
 	private long trussID;
 	private boolean isInATruss;
 	
-	public KTrussesNodeWritable() {}
+	public VertexState() {}
 	
-	public KTrussesNodeWritable(int degree, long trussID, boolean isInATruss) {
+	public VertexState(int degree, long trussID, boolean isInATruss) {
 		this.degree = degree;
 		this.trussID = trussID;
 		this.isInATruss = isInATruss;

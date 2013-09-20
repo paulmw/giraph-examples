@@ -11,7 +11,7 @@ import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
 
 
-public class TrianglesVertex extends Vertex<LongWritable, IntWritable, IntWritable, TriangleMessageWritable>{
+public class TrianglesVertex extends Vertex<LongWritable, IntWritable, IntWritable, Message>{
 	
 	/*
 	 * This method is used to compare two nodes by degree and name, in order to determine the
@@ -30,7 +30,7 @@ public class TrianglesVertex extends Vertex<LongWritable, IntWritable, IntWritab
 	}
 
 	@Override
-	public void compute(Iterable<TriangleMessageWritable> messages) throws IOException {
+	public void compute(Iterable<Message> messages) throws IOException {
 
 		System.out.println("Superstep " + getSuperstep() + ", node " + getId());
 		
@@ -38,12 +38,12 @@ public class TrianglesVertex extends Vertex<LongWritable, IntWritable, IntWritab
 		if(getSuperstep() == 0) {
 			IntWritable degree = new IntWritable(getNumEdges());
 			setValue(degree);
-			sendMessageToAllEdges(new TriangleMessageWritable(getId(), degree));
+			sendMessageToAllEdges(new Message(getId(), degree));
 		}
 
 		// Phase 1 - annotate degrees onto edges
 		if(getSuperstep() == 1) {
-			for(TriangleMessageWritable message : messages) {
+			for(Message message : messages) {
 				setEdgeValue(message.getSource(), message.getDegree());
 			}
 		}
@@ -59,7 +59,7 @@ public class TrianglesVertex extends Vertex<LongWritable, IntWritable, IntWritab
 							int neighbourBDegree = neighbourB.getValue().get();
 							if(ordering(neighbourADegree, neighbourA.getTargetVertexId().get(), neighbourBDegree, neighbourB.getTargetVertexId().get())) {
 								System.out.println("I am node " + getId() + ", and I will ask node " + neighbourA.getTargetVertexId() + " whether it links to  " + neighbourB.getTargetVertexId());
-								sendMessage(neighbourA.getTargetVertexId(), new TriangleMessageWritable(getId(), neighbourB.getTargetVertexId()));
+								sendMessage(neighbourA.getTargetVertexId(), new Message(getId(), neighbourB.getTargetVertexId()));
 							}
 						}
 					}	
@@ -76,7 +76,7 @@ public class TrianglesVertex extends Vertex<LongWritable, IntWritable, IntWritab
 			for(MutableEdge<LongWritable, IntWritable> edge : getMutableEdges()) {
 				edges.add(edge.getTargetVertexId().get());
 			}
-			for(TriangleMessageWritable message : messages) {
+			for(Message message : messages) {
 				System.out.println("I am node " + getId() + ", and I received this: \"" + message + "\"");
 				if(edges.contains(message.getTriadA().get()) && edges.contains(message.getTriadB().get())) {
 					System.out.println("I am node " + getId() + ", and I found the triangle (" + getId() + "," + message.getTriadA() + "," + message.getTriadB() + ")");

@@ -13,7 +13,7 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 
-public class TrianglesVertexInputFormat extends TextVertexInputFormat<LongWritable, IntWritable, IntWritable>{
+public class InputFormat extends TextVertexInputFormat<LongWritable, IntWritable, IntWritable>{
 	
 	@Override
 	public TextVertexReader createVertexReader(

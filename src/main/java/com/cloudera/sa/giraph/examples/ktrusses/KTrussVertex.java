@@ -11,13 +11,19 @@ import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
 
 /*
- * This algorithm finding trusses in a graph by using a series of algorithm phases. It first performs KCore, to deactivate edges that 
- * can never be part of a truss. It then finds triangles (which needs the node degrees) and finds trusses. Once the trusses are found, 
+ * This algorithm finds trusses in a graph.
+ * 
+ * Trusses are found using a series of algorithm phases: finding the k-core, to deactivate edges that can never be part of a truss;
+ * finding the active degree of each node and putting that on the edges; finding triangles by intelligently querying to find closing
+ * edges of open triads; finding the truss support of each edge and repeating everything after k-core until no edges are deactivated.
+ * Once the trusses are found
+ * 
+ *  finds trusses. Once the trusses are found, 
  * a final Componentisation step is used to label each truss with a unique name for visualisation.
  */
-public class KTrussesVertex extends Vertex<LongWritable, KTrussesNodeWritable, KTrussesEdgeWritable, KTrussesMessageWritable>{
+public class KTrussVertex extends Vertex<LongWritable, VertexState, EdgeState, Message>{
 
-	private int k = 4;
+	private static final LongWritable ONE = new LongWritable(1);
 
 	/*
 	 * This method is used to compare two nodes by degree and name, in order to determine the
@@ -35,33 +41,65 @@ public class KTrussesVertex extends Vertex<LongWritable, KTrussesNodeWritable, K
 		return false;
 	}
 
+	/*
+	 * This returns the number of active edges this node has.
+	 */
+	private int getActiveDegree() {
+		int degree = 0;
+		for(Edge<LongWritable, EdgeState> edge : getEdges()) {
+			if(edge.getValue().isActive()) {
+				degree++;
+			}
+		}
+		return degree;
+	}
+	
+	/*
+	 * This is a utility method to send messages to active nodes.
+	 */
+	private void sendMessageToAllActiveNodes(Message message) {
+		for(Edge<LongWritable, EdgeState> edge : getEdges()) {
+			if(edge.getValue().isActive()) {
+				sendMessage(edge.getTargetVertexId(), message);
+			}
+		}
+	}
+	
+	/*
+	 * This a utility method to evaluate a triangle message and use that to increment the support on each edge
+	 * that is a part of the triangle.
+	 */
+	private void incrementSupport(LongWritable nodeID) {
+		if(!nodeID.equals(getId())) {
+			EdgeState ev = getEdgeValue(nodeID);
+			ev.setSupport(ev.getSupport() + 1);
+			setEdgeValue(nodeID, ev);
+		}
+	}
+	
 	@Override
-	public void compute(Iterable<KTrussesMessageWritable> messages) throws IOException {
+	public void compute(Iterable<Message> messages) throws IOException {
 
 		// Retreive the current phase of processing which is set by the MasterCompute
-		WritableKTrussesPhase writablePhase = getAggregatedValue(Constants.PHASE);
-		KTrussesPhase phase = writablePhase.get();
+		PhaseWritable writablePhase = getAggregatedValue(Constants.PHASE);
+		Phase phase = writablePhase.get();
 
+		int k = getContext().getConfiguration().getInt(Constants.K, 3);
+		
 		/*
 		 * This phase reduces the graph to k-1 core, which reduces the amount of work to find trusses.
 		 */
-		if(phase == KTrussesPhase.KCORE) {
-			// Determine active degree
-			int degree = 0;
-			for(Edge<LongWritable, KTrussesEdgeWritable> edge : getEdges()) {
-				if(edge.getValue().isActive()) {
-					degree++;
-				}
-			}
+		if(phase == Phase.KCORE) {
 			
 			// Deactivate edges that can't be part of a truss because their degree is too low
+			int degree = getActiveDegree();
 			if(degree < k - 1) {
-				for(Edge<LongWritable, KTrussesEdgeWritable> edge : getEdges()) {
+				for(Edge<LongWritable, EdgeState> edge : getEdges()) {
 					if(edge.getValue().isActive()) {
-						KTrussesEdgeWritable ev = getEdgeValue(edge.getTargetVertexId());
+						EdgeState ev = getEdgeValue(edge.getTargetVertexId());
 						ev.setActive(false);
 						setEdgeValue(edge.getTargetVertexId(), ev);
-						aggregate(Constants.UPDATES, new LongWritable(1));
+						aggregate(Constants.UPDATES, ONE);
 					}
 				}
 			}
@@ -72,24 +110,11 @@ public class KTrussesVertex extends Vertex<LongWritable, KTrussesNodeWritable, K
 		 * after not considering edges which can't be part of a truss). The degree is used to make triangle
 		 * finding more efficient in later phases.
 		 */
-		if(phase == KTrussesPhase.DEGREE) {
-			// Determine active degree
-			int degree = 0;
-			for(Edge<LongWritable, KTrussesEdgeWritable> edge : getEdges()) {
-				if(edge.getValue().isActive()) {
-					degree++;
-				}
-			}
-			KTrussesNodeWritable nw = new KTrussesNodeWritable(degree, -1, false);
-			setValue(nw);
-
-			// Broadcast it
-			KTrussesMessageWritable message = new KTrussesMessageWritable(getId(), new IntWritable(degree));
-			for(Edge<LongWritable, KTrussesEdgeWritable> edge : getEdges()) {
-				if(edge.getValue().isActive()) {
-					sendMessage(edge.getTargetVertexId(), message);
-				}
-			}
+		if(phase == Phase.DEGREE) {
+			// Determine active degree, store it in the node state and send it to all active neighbours
+			int degree = getActiveDegree();
+			setValue(new VertexState(degree, -1, false));
+			sendMessageToAllActiveNodes(new Message(getId(), new IntWritable(degree)));
 		}
 
 		/*
@@ -103,13 +128,13 @@ public class KTrussesVertex extends Vertex<LongWritable, KTrussesNodeWritable, K
 		 * query to the node that isn't the highest degree.
 		 */
 
-		if(phase == KTrussesPhase.QUERY_FOR_CLOSING_EDGES) {
+		if(phase == Phase.QUERY_FOR_CLOSING_EDGES) {
 
 			//First, we need to process the degree information and store it on our edges.
-			for(KTrussesMessageWritable message : messages) {
-				KTrussesEdgeWritable edgeValue = getEdgeValue(message.getSource());
+			for(Message message : messages) {
+				EdgeState edgeValue = getEdgeValue(message.getSource());
 				if(edgeValue == null) {
-					edgeValue = new KTrussesEdgeWritable();
+					edgeValue = new EdgeState();
 				}
 				int targetDegree = message.getDegree().get();
 				edgeValue.setTargetDegree(targetDegree);
@@ -119,15 +144,15 @@ public class KTrussesVertex extends Vertex<LongWritable, KTrussesNodeWritable, K
 			// Now we find the possible triangles and send a query message to each.
 			int myDegree = getValue().getDegree();
 			if(myDegree > 1) {
-				for(Edge<LongWritable, KTrussesEdgeWritable> neighbourA : getEdges()) {
+				for(Edge<LongWritable, EdgeState> neighbourA : getEdges()) {
 					if(neighbourA.getValue().isActive()) {
 						int neighbourADegree = neighbourA.getValue().getTargetDegree();
 						if(ordering(myDegree, getId().get(), neighbourADegree, neighbourA.getTargetVertexId().get())) {
-							for(Edge<LongWritable, KTrussesEdgeWritable> neighbourB : getEdges()) {
+							for(Edge<LongWritable, EdgeState> neighbourB : getEdges()) {
 								if(neighbourB.getValue().isActive()) {
 									int neighbourBDegree = neighbourB.getValue().getTargetDegree();
 									if(ordering(neighbourADegree, neighbourA.getTargetVertexId().get(), neighbourBDegree, neighbourB.getTargetVertexId().get())) {
-										sendMessage(neighbourA.getTargetVertexId(), new KTrussesMessageWritable(getId(), neighbourB.getTargetVertexId()));
+										sendMessage(neighbourA.getTargetVertexId(), new Message(getId(), neighbourB.getTargetVertexId()));
 									}
 								}
 							}
@@ -141,22 +166,23 @@ public class KTrussesVertex extends Vertex<LongWritable, KTrussesNodeWritable, K
 		 * In this phase, we process the queries about closing edges and find triangles if the are present. We then
 		 * send details of the triangle (which is only found by one node) to all nodes in that triangle.
 		 */
-		if(phase == KTrussesPhase.FIND_TRIANGLES) {
+		if(phase == Phase.FIND_TRIANGLES) {
 
 			// Cache my active neighbour's names
 			Set<Long> edges = new HashSet<Long>();
-			for(MutableEdge<LongWritable, KTrussesEdgeWritable> edge : getMutableEdges()) {
+			for(MutableEdge<LongWritable, EdgeState> edge : getMutableEdges()) {
 				if(edge.getValue().isActive()) {
 					edges.add(edge.getTargetVertexId().get());
 				}
 			}
 
 			// Find triangles and report them to participating nodes. 
-			for(KTrussesMessageWritable message : messages) {
+			for(Message message : messages) {
 				if(edges.contains(message.getTriadA().get()) && edges.contains(message.getTriadB().get())) {
-					sendMessage(getId(),             new KTrussesMessageWritable(getId(), message.getTriadA(), message.getTriadB()));
-					sendMessage(message.getTriadA(), new KTrussesMessageWritable(getId(), message.getTriadA(), message.getTriadB()));
-					sendMessage(message.getTriadB(), new KTrussesMessageWritable(getId(), message.getTriadA(), message.getTriadB()));
+					Message triangle = new Message(getId(), message.getTriadA(), message.getTriadB());
+					sendMessage(getId(), triangle);
+					sendMessage(message.getTriadA(), triangle);
+					sendMessage(message.getTriadB(), triangle);
 				}
 			}
 		}
@@ -169,45 +195,32 @@ public class KTrussesVertex extends Vertex<LongWritable, KTrussesNodeWritable, K
 		 * determining the active degree, otherwise we continue.
 		 * 
 		 */
-		if(phase == KTrussesPhase.TRUSSES) {
+		if(phase == Phase.TRUSSES) {
 
 			// Clear out support values from previous iterations
-			for(Edge<LongWritable, KTrussesEdgeWritable> edge : getEdges()) {
-				KTrussesEdgeWritable ev = getEdgeValue(edge.getTargetVertexId());
+			for(Edge<LongWritable, EdgeState> edge : getEdges()) {
+				EdgeState ev = getEdgeValue(edge.getTargetVertexId());
 				ev.setSupport(0);
 				setEdgeValue(edge.getTargetVertexId(), ev);
 			}
 
 			// Build a picture of the support of each edge
-			for(KTrussesMessageWritable message : messages) {
-				if(!message.getTriangleA().equals(getId())) {
-					KTrussesEdgeWritable ev = getEdgeValue(message.getTriangleA());
-					ev.setSupport(ev.getSupport() + 1);
-					setEdgeValue(message.getTriangleA(), ev);
-				}
-				if(!message.getTriangleB().equals(getId())) {
-					KTrussesEdgeWritable ev = getEdgeValue(message.getTriangleB());
-					ev.setSupport(ev.getSupport() + 1);
-					setEdgeValue(message.getTriangleB(), ev);
-				}
-				if(!message.getTriangleC().equals(getId())) {
-					KTrussesEdgeWritable ev = getEdgeValue(message.getTriangleC());
-					ev.setSupport(ev.getSupport() + 1);
-					setEdgeValue(message.getTriangleC(), ev);
-				}
+			for(Message message : messages) {
+				incrementSupport(message.getTriangleA());
+				incrementSupport(message.getTriangleB());
+				incrementSupport(message.getTriangleC());
 			}
 
 			/*
 			 * Go through our edges, marking any that don't have enough support as inactive. We also track how
 			 * many edges we deactivated.
 			 */
-			for(Edge<LongWritable, KTrussesEdgeWritable> edge : getEdges()) {
+			for(Edge<LongWritable, EdgeState> edge : getEdges()) {
 				if(edge.getValue().isActive()) {
 					if(edge.getValue().getSupport() < k - 2) {
-						KTrussesEdgeWritable ev = getEdgeValue(edge.getTargetVertexId());
+						EdgeState ev = getEdgeValue(edge.getTargetVertexId());
 						ev.setActive(false);
 						ev.setSupport(0);
-
 						setEdgeValue(edge.getTargetVertexId(), ev);
 					}
 				}
@@ -219,24 +232,23 @@ public class KTrussesVertex extends Vertex<LongWritable, KTrussesNodeWritable, K
 		 * because it is initialised to be the same as their ID, so we use that to determine the lowest
 		 * local truss ID. Once that is found, we broadcast it in order to let the value propagate.
 		 */
-		if(phase == KTrussesPhase.COMPONENTISATION_1) {
+		if(phase == Phase.COMPONENTISATION_1) {
 			
 			boolean updated = false;
 			boolean isInATruss = false;
 			
 			// Determine whether the current node is in a truss or not.
-			for(Edge<LongWritable, KTrussesEdgeWritable> edge : getEdges()) {
+			for(Edge<LongWritable, EdgeState> edge : getEdges()) {
 				if(edge.getValue().isActive()) {
 					isInATruss = true;
 					break;
 				}
 			}
 
-			
 			if(isInATruss) {
 				// Determine lowest Truss ID
 				long lowestId = getId().get();
-				for(Edge<LongWritable, KTrussesEdgeWritable> edge : getEdges()) {
+				for(Edge<LongWritable, EdgeState> edge : getEdges()) {
 					if(edge.getValue().isActive()) {
 						lowestId = Math.min(lowestId, edge.getTargetVertexId().get());
 					}
@@ -249,12 +261,7 @@ public class KTrussesVertex extends Vertex<LongWritable, KTrussesNodeWritable, K
 
 				// Broadcast the lowest truss ID if we were updated with it
 				if(updated) {
-					KTrussesMessageWritable message = new KTrussesMessageWritable(new LongWritable(getValue().getTrussID()));
-					for(Edge<LongWritable, KTrussesEdgeWritable> edge : getEdges()) {
-						if(edge.getValue().isActive()) {
-							sendMessage(edge.getTargetVertexId(), message);
-						}
-					}
+					sendMessageToAllActiveNodes(new Message(new LongWritable(getValue().getTrussID())));
 				}
 			}
 		}
@@ -263,37 +270,34 @@ public class KTrussesVertex extends Vertex<LongWritable, KTrussesNodeWritable, K
 		 * This is the second phase of the componentisation, in which the lowest truss ID received is propagated.
 		 * If the truss ID is lowered, we again rebroadcast it and stay in this phase until there are no more updates.
 		 */
-		if(phase == KTrussesPhase.COMPONENTISATION_2) {
+		if(phase == Phase.COMPONENTISATION_2) {
 			// Determine lowest Truss ID
 			long lowestValue = getValue().getTrussID();
-			for(KTrussesMessageWritable message : messages) {
+			for(Message message : messages) {
 				lowestValue = Math.min(lowestValue, message.getTrussID().get());
 			}
 			boolean updated = false;
 			if(lowestValue < getValue().getTrussID()) {
 				getValue().setTrussID(lowestValue);
-				aggregate(Constants.UPDATES, new LongWritable(1));
+				aggregate(Constants.UPDATES, ONE);
 				updated = true;
 
 			}
 			
 			// Broadcast the lowest truss ID if we were updated with it
 			if(updated) {
-				KTrussesMessageWritable message = new KTrussesMessageWritable(new LongWritable(getValue().getTrussID()));
-				for(Edge<LongWritable, KTrussesEdgeWritable> edge : getEdges()) {
-					if(edge.getValue().isActive()) {
-						sendMessage(edge.getTargetVertexId(), message);
-					}
-				}
+				sendMessageToAllActiveNodes(new Message(new LongWritable(getValue().getTrussID())));
 			}
 		}
 
 		/*
 		 * And we're done :)
 		 */
-		if(phase == KTrussesPhase.OUTPUT) {
+		if(phase == Phase.OUTPUT) {
 			voteToHalt();
 		}
 	}
+
+
 
 }

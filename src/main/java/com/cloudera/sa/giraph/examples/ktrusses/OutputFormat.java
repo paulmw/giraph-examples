@@ -8,7 +8,7 @@ import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 
-public class KTrussesVertexOutputFormat extends TextVertexOutputFormat<LongWritable, KTrussesNodeWritable, KTrussesEdgeWritable> {
+public class OutputFormat extends TextVertexOutputFormat<LongWritable, VertexState, EdgeState> {
 
 	@Override
 	public TextVertexWriter createVertexWriter(
@@ -23,7 +23,7 @@ public class KTrussesVertexOutputFormat extends TextVertexOutputFormat<LongWrita
 		private Text line = new Text();
 		private StringBuilder sb = new StringBuilder();
 		
-		public void writeVertex(Vertex<LongWritable, KTrussesNodeWritable, KTrussesEdgeWritable, ?> vertex) throws IOException, InterruptedException {
+		public void writeVertex(Vertex<LongWritable, VertexState, EdgeState, ?> vertex) throws IOException, InterruptedException {
 			sb.append("Node: " + vertex.getId());
 			if(vertex.getValue().isInATruss()) {
 				sb.append(", trussID: " + vertex.getValue().getTrussID());

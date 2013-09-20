@@ -9,7 +9,7 @@ import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 
-public class ComponentisationVertexOutputFormat extends TextVertexOutputFormat<LongWritable, LongWritable, NullWritable> {
+public class OutputFormat extends TextVertexOutputFormat<LongWritable, LongWritable, NullWritable> {
 
 	@Override
 	public TextVertexWriter createVertexWriter(

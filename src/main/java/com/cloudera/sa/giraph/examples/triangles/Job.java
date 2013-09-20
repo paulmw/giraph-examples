@@ -6,7 +6,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 
-public class TrianglesJob 
+public class Job 
 {
 	public static void main(String[] args) throws Exception {
 	    
@@ -21,13 +21,13 @@ public class TrianglesJob
 		String inputLocation = args[1];
 		String outputLocation = args[2];
 		
-	    GiraphJob bspJob = new GiraphJob(new Configuration(), TrianglesJob.class.getName());
+	    GiraphJob bspJob = new GiraphJob(new Configuration(), Job.class.getName());
 	    
 	    bspJob.getConfiguration().setVertexClass(TrianglesVertex.class);
-	    bspJob.getConfiguration().setVertexInputFormatClass(TrianglesVertexInputFormat.class);
+	    bspJob.getConfiguration().setVertexInputFormatClass(InputFormat.class);
 	    GiraphFileInputFormat.addVertexInputPath(bspJob.getConfiguration(), new Path(inputLocation));
 	    
-	    bspJob.getConfiguration().setVertexOutputFormatClass(TrianglesVertexOutputFormat.class);
+	    bspJob.getConfiguration().setVertexOutputFormatClass(OutputFormat.class);
 	    
 	    int minWorkers = Integer.parseInt(numberOfWorkers);
 	    int maxWorkers = Integer.parseInt(numberOfWorkers);

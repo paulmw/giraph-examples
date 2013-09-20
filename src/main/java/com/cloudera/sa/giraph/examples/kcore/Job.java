@@ -1,4 +1,4 @@
-package com.cloudera.sa.giraph.examples.componentisation;
+package com.cloudera.sa.giraph.examples.kcore;
 
 import org.apache.giraph.io.formats.GiraphFileInputFormat;
 import org.apache.giraph.job.GiraphJob;
@@ -6,14 +6,14 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 
-public class ComponentisationJob 
+public class Job 
 {
 	public static void main(String[] args) throws Exception {
 	    
 		if (args.length != 3) {
-			System.out.println("Componentisation Help:");
-			System.out.println("Parameters: Componentisation <numbersOfWorkers> <inputLocaiton> <outputLocation>");
-			System.out.println("Example: Componentisation 1 inputFolder outputFolder");
+			System.out.println("KCore Help:");
+			System.out.println("Parameters: <numbersOfWorkers> <inputLocation> <outputLocation>");
+			System.out.println("Example: 1 inputFolder outputFolder");
 			return;
 		}
 		
@@ -21,15 +21,13 @@ public class ComponentisationJob
 		String inputLocation = args[1];
 		String outputLocation = args[2];
 		
-	    GiraphJob bspJob = new GiraphJob(new Configuration(), ComponentisationJob.class.getName());
+	    GiraphJob bspJob = new GiraphJob(new Configuration(), Job.class.getName());
 	    
-	    bspJob.getConfiguration().setVertexClass(ComponentisationVertex.class);
-	    bspJob.getConfiguration().setVertexInputFormatClass(ComponentisationVertexInputFormat.class);
+	    bspJob.getConfiguration().setVertexClass(KCoreVertex.class);
+	    bspJob.getConfiguration().setVertexInputFormatClass(InputFormat.class);
 	    GiraphFileInputFormat.addVertexInputPath(bspJob.getConfiguration(), new Path(inputLocation));
 	    
-	    bspJob.getConfiguration().setVertexOutputFormatClass(ComponentisationVertexOutputFormat.class);
-	    bspJob.getConfiguration().setWorkerContextClass(ComponentisationWorkerContext.class);
-	    bspJob.getConfiguration().setMasterComputeClass(ComponentisationMasterCompute.class);
+	    bspJob.getConfiguration().setVertexOutputFormatClass(OutputFormat.class);
 	    
 	    int minWorkers = Integer.parseInt(numberOfWorkers);
 	    int maxWorkers = Integer.parseInt(numberOfWorkers);

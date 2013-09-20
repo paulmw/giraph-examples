@@ -6,15 +6,15 @@ import java.io.IOException;
 
 import org.apache.hadoop.io.Writable;
 
-public class KTrussesEdgeWritable implements Writable {
+public class EdgeState implements Writable {
 
 	private int targetDegree;
 	private int support;
 	private boolean active;
 	
-	public KTrussesEdgeWritable() {}
+	public EdgeState() {}
 	
-	public KTrussesEdgeWritable(int targetDegree, int support, boolean active) {
+	public EdgeState(int targetDegree, int support, boolean active) {
 		this.targetDegree = targetDegree;
 		this.support = support;
 		this.active = active;

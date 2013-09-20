@@ -7,28 +7,28 @@ import java.io.IOException;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableUtils;
 
-public class WritableKTrussesPhase implements Writable {
+public class PhaseWritable implements Writable {
 	
-	private KTrussesPhase phase;
+	private Phase phase;
 	
-	public WritableKTrussesPhase() {}
+	public PhaseWritable() {}
 	
-	public WritableKTrussesPhase(KTrussesPhase phase) {
+	public PhaseWritable(Phase phase) {
 		this.phase = phase;
 	}
 
-	public KTrussesPhase get() {
+	public Phase get() {
 		return phase;
 	}
 
-	public void set(KTrussesPhase phase) {
+	public void set(Phase phase) {
 		this.phase = phase;
 	}
 
 	public void readFields(DataInput in) throws IOException {
 		boolean isNull = in.readBoolean();
 		if(!isNull) {
-			phase = WritableUtils.readEnum(in, KTrussesPhase.class);
+			phase = WritableUtils.readEnum(in, Phase.class);
 		}
 	}
 

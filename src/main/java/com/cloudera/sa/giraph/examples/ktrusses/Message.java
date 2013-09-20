@@ -8,7 +8,7 @@ import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Writable;
 
-public class KTrussesMessageWritable implements Writable {
+public class Message implements Writable {
 
 	public enum Type {
 
@@ -55,28 +55,28 @@ public class KTrussesMessageWritable implements Writable {
 	// Truss ID
 	private LongWritable trussID;
 	
-	public KTrussesMessageWritable() {}
+	public Message() {}
 
-	public KTrussesMessageWritable(LongWritable source, IntWritable degree) {
+	public Message(LongWritable source, IntWritable degree) {
 		this.type = Type.DEGREE_UPDATE;
 		this.source = new LongWritable(source.get());
 		this.degree = new IntWritable(degree.get());
 	}
 
-	public KTrussesMessageWritable(LongWritable triadA, LongWritable triadB) {
+	public Message(LongWritable triadA, LongWritable triadB) {
 		this.type = Type.OPEN_TRIAD;
 		this.triadA = new LongWritable(triadA.get());
 		this.triadB = new LongWritable(triadB.get());
 	}
 	
-	public KTrussesMessageWritable(LongWritable triangleA, LongWritable triangleB, LongWritable triangleC) {
+	public Message(LongWritable triangleA, LongWritable triangleB, LongWritable triangleC) {
 		this.type = Type.TRIANGLE;
 		this.triangleA = new LongWritable(triangleA.get());
 		this.triangleB = new LongWritable(triangleB.get());
 		this.triangleC = new LongWritable(triangleC.get());
 	}
 	
-	public KTrussesMessageWritable(LongWritable trussID) {
+	public Message(LongWritable trussID) {
 		this.type = Type.TRUSS_ID;
 		this.trussID = new LongWritable(trussID.get());
 	}

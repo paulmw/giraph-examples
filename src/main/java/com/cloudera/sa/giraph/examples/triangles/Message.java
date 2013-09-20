@@ -8,7 +8,7 @@ import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Writable;
 
-public class TriangleMessageWritable implements Writable {
+public class Message implements Writable {
 
 	public enum Type {
 
@@ -50,21 +50,21 @@ public class TriangleMessageWritable implements Writable {
 	private LongWritable triangleB;
 	private LongWritable triangleC;
 	
-	public TriangleMessageWritable() {}
+	public Message() {}
 
-	public TriangleMessageWritable(LongWritable source, IntWritable degree) {
+	public Message(LongWritable source, IntWritable degree) {
 		this.type = Type.DEGREE_UPDATE;
 		this.source = new LongWritable(source.get());
 		this.degree = new IntWritable(degree.get());
 	}
 
-	public TriangleMessageWritable(LongWritable triadA, LongWritable triadB) {
+	public Message(LongWritable triadA, LongWritable triadB) {
 		this.type = Type.OPEN_TRIAD;
 		this.triadA = new LongWritable(triadA.get());
 		this.triadB = new LongWritable(triadB.get());
 	}
 	
-	public TriangleMessageWritable(LongWritable triangleA, LongWritable triangleB, LongWritable triangleC) {
+	public Message(LongWritable triangleA, LongWritable triangleB, LongWritable triangleC) {
 		this.type = Type.TRIANGLE;
 		this.triangleA = new LongWritable(triangleA.get());
 		this.triangleB = new LongWritable(triangleB.get());

@@ -10,7 +10,7 @@ import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 
-public class TrianglesVertexOutputFormat extends TextVertexOutputFormat<LongWritable, IntWritable, IntWritable> {
+public class OutputFormat extends TextVertexOutputFormat<LongWritable, IntWritable, IntWritable> {
 
 	@Override
 	public TextVertexWriter createVertexWriter(
