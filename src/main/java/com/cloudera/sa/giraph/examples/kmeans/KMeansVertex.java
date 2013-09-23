@@ -61,7 +61,6 @@ public class KMeansVertex extends Vertex<LongWritable, NodeState, NullWritable, 
 			for(int i = 0; i < k; i++) {
 				means[i] = getAggregatedValue(Constants.POINT_PREFIX + i);
 				double d = distance(getValue().getPoint().getData(), means[i].getData());
-				System.out.println("I'm node " + getValue() + ", and I'm " + d + " from " + means[i]);
 				if(d < closestDistance) {
 					closestDistance = d;
 					closest = i;
